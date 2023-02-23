@@ -1,17 +1,19 @@
 package prose
 
+import "fmt"
+
 // A DocOpt represents a setting that changes the document creation process.
 //
 // For example, it might disable named-entity extraction:
 //
-//    doc := prose.NewDocument("...", prose.WithExtraction(false))
+//	doc := prose.NewDocument("...", prose.WithExtraction(false))
 type DocOpt func(doc *Document, opts *DocOpts)
 
 // DocOpts controls the Document creation process:
 type DocOpts struct {
-	Extract  bool // If true, include named-entity extraction
-	Segment  bool // If true, include segmentation
-	Tag      bool // If true, include POS tagging
+	Extract   bool      // If true, include named-entity extraction
+	Segment   bool      // If true, include segmentation
+	Tag       bool      // If true, include POS tagging
 	Tokenizer Tokenizer // If true, include tokenization
 }
 
@@ -93,16 +95,16 @@ func (doc *Document) Entities() []Entity {
 
 var defaultOpts = DocOpts{
 	Tokenizer: NewIterTokenizer(),
-	Segment:  true,
-	Tag:      true,
-	Extract:  true,
+	Segment:   true,
+	Tag:       true,
+	Extract:   true,
 }
 
 // NewDocument creates a Document according to the user-specified options.
 //
 // For example,
 //
-//    doc := prose.NewDocument("...")
+//	doc := prose.NewDocument("...")
 func NewDocument(text string, opts ...DocOpt) (*Document, error) {
 	var pipeError error
 
@@ -113,7 +115,10 @@ func NewDocument(text string, opts ...DocOpt) (*Document, error) {
 	}
 
 	if doc.Model == nil {
-		doc.Model = defaultModel(base.Tag, base.Extract)
+		doc.Model, pipeError = defaultModel(base.Tag, base.Extract)
+		if pipeError != nil {
+			return nil, fmt.Errorf("unable to load default model: %w", pipeError)
+		}
 	}
 
 	if base.Segment {
