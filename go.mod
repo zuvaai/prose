@@ -1,4 +1,4 @@
-module github.com/zuvaai/prose/v3-alpha
+module github.com/zuvaai/prose/v3
 
 go 1.16
 
