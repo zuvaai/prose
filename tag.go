@@ -319,7 +319,7 @@ func NewPerceptronTagger() (*PerceptronTagger, error) {
 }
 
 // Tag takes a slice of words and returns a slice of tagged tokens.
-func (pt *PerceptronTagger) tag(tokens []*Token) []*Token {
+func (pt *PerceptronTagger) Tag(tokens []*Token) []*Token {
 	var tag string
 	var found bool
 

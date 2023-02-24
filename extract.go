@@ -273,7 +273,7 @@ func makeCorpus(data []EntityContext, tagger *PerceptronTagger, tokenizer Tokeni
 	corpus := featureSet{}
 	for i := range data {
 		entry := &data[i]
-		tokens := tagger.tag(tokenizer.Tokenize(entry.Text))
+		tokens := tagger.Tag(tokenizer.Tokenize(entry.Text))
 		history := assignLabels(tokens, entry)
 		for _, element := range extractFeatures(tokens, history) {
 			corpus = append(corpus, element)

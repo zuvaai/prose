@@ -51,7 +51,7 @@ func TestTagTreebank(t *testing.T) {
 	checkError(json.Unmarshal(treebank, &tokens))
 
 	correct := 0.0
-	for i, tok := range tagger.tag(tokens) {
+	for i, tok := range tagger.Tag(tokens) {
 		if expected[i] == tok.Tag {
 			correct++
 		}
@@ -71,7 +71,7 @@ func BenchmarkTag(b *testing.B) {
 	treebank := readDataFile(filepath.Join(testdata, "treebank_tokens.json"))
 	checkError(json.Unmarshal(treebank, &tokens))
 	for n := 0; n < b.N; n++ {
-		_ = tagger.tag(tokens)
+		_ = tagger.Tag(tokens)
 	}
 }
 

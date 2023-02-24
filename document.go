@@ -129,7 +129,7 @@ func NewDocument(text string, opts ...DocOpt) (*Document, error) {
 		doc.tokens = append(doc.tokens, base.Tokenizer.Tokenize(text)...)
 	}
 	if base.Tag || base.Extract {
-		doc.tokens = doc.Model.tagger.tag(doc.tokens)
+		doc.tokens = doc.Model.tagger.Tag(doc.tokens)
 	}
 	if base.Extract {
 		doc.tokens = doc.Model.extracter.classify(doc.tokens)
