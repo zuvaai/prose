@@ -1,4 +1,4 @@
-module github.com/jdkato/prose/v3
+module github.com/zuvaai/prose/v3-alpha
 
 go 1.16
 
