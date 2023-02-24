@@ -12,7 +12,7 @@ import (
 type Model struct {
 	Name string
 
-	tagger    *perceptronTagger
+	tagger    *PerceptronTagger
 	extracter *entityExtracter
 }
 
@@ -67,7 +67,7 @@ func ModelFromData(name string, sources ...DataSource) (*Model, error) {
 // ModelFromDisk loads a Model from the user-provided location.
 func ModelFromDisk(path string) (*Model, error) {
 	filesys := os.DirFS(path)
-	tagger, err := newPerceptronTagger()
+	tagger, err := NewPerceptronTagger()
 	if err != nil {
 		return nil, fmt.Errorf("unable to load POS tager from disk: %w", err)
 	}
@@ -102,7 +102,7 @@ func ModelFromFS(name string, filesys fs.FS) (*Model, error) {
 	if err != io.EOF {
 		checkError(err)
 	}
-	tagger, err := newPerceptronTagger()
+	tagger, err := NewPerceptronTagger()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create POS tagger: %w", err)
 	}
@@ -167,11 +167,11 @@ func loadClassifier(filesys fs.FS) *entityExtracter {
 }
 
 func defaultModel(tagging, classifying bool) (*Model, error) {
-	var tagger *perceptronTagger
+	var tagger *PerceptronTagger
 	var classifier *entityExtracter
 	var err error
 	if tagging || classifying {
-		tagger, err = newPerceptronTagger()
+		tagger, err = NewPerceptronTagger()
 		if err != nil {
 			return nil, fmt.Errorf("unable to load default POS tagger: %w", err)
 		}

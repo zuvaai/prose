@@ -267,13 +267,13 @@ func (m *averagedPerceptron) addClass(class string) {
 
 // perceptronTagger is a port of Textblob's "fast and accurate" POS tagger.
 // See https://github.com/sloria/textblob-aptagger for details.
-type perceptronTagger struct {
+type PerceptronTagger struct {
 	model *averagedPerceptron
 }
 
 // newPerceptronTagger creates a new PerceptronTagger and loads the built-in
 // AveragedPerceptron model.
-func newPerceptronTagger() (*perceptronTagger, error) {
+func NewPerceptronTagger() (*PerceptronTagger, error) {
 	var wts map[string]map[string]float64
 	var tags map[string]string
 	var classes []string
@@ -315,11 +315,11 @@ func newPerceptronTagger() (*perceptronTagger, error) {
 		return nil, fmt.Errorf("unable to decode lienar weights: %w", err)
 	}
 
-	return &perceptronTagger{model: newAveragedPerceptron(wts, tags, classes, lwts)}, nil
+	return &PerceptronTagger{model: newAveragedPerceptron(wts, tags, classes, lwts)}, nil
 }
 
-// tag takes a slice of words and returns a slice of tagged tokens.
-func (pt *perceptronTagger) tag(tokens []*Token) []*Token {
+// Tag takes a slice of words and returns a slice of tagged tokens.
+func (pt *PerceptronTagger) tag(tokens []*Token) []*Token {
 	var tag string
 	var found bool
 

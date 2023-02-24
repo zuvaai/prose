@@ -40,7 +40,7 @@ func TestTagSimple(t *testing.T) {
 }
 
 func TestTagTreebank(t *testing.T) {
-	tagger, err := newPerceptronTagger()
+	tagger, err := NewPerceptronTagger()
 	assert.NoError(t, err)
 	tokens, expected := []*Token{}, []string{}
 
@@ -64,7 +64,7 @@ func TestTagTreebank(t *testing.T) {
 }
 
 func BenchmarkTag(b *testing.B) {
-	tagger, err := newPerceptronTagger()
+	tagger, err := NewPerceptronTagger()
 	assert.NoError(b, err)
 	tokens := []*Token{}
 

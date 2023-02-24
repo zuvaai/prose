@@ -269,7 +269,7 @@ func assignLabels(tokens []*Token, entity *EntityContext) []string {
 	return history
 }
 
-func makeCorpus(data []EntityContext, tagger *perceptronTagger, tokenizer Tokenizer) featureSet {
+func makeCorpus(data []EntityContext, tagger *PerceptronTagger, tokenizer Tokenizer) featureSet {
 	corpus := featureSet{}
 	for i := range data {
 		entry := &data[i]
