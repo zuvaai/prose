@@ -16,34 +16,34 @@ import (
 var maxLogDiff = math.Log2(1e-30)
 
 type mappedProbDist struct {
-	dict map[string]float64
+	dict map[string]*probEnc
 	log  bool
 }
 
 func (m *mappedProbDist) prob(label string) float64 {
 	if p, found := m.dict[label]; found {
-		return math.Pow(2, p)
+		return math.Pow(2, p.prob)
 	}
 	return 0.0
 }
 
-func newMappedProbDist(dict map[string]float64, normalize bool) *mappedProbDist {
+func newMappedProbDist(dict map[string]*probEnc, normalize bool) *mappedProbDist {
 	if normalize {
 		values := make([]float64, len(dict))
 		i := 0
 		for _, v := range dict {
-			values[i] = v
+			values[i] = v.prob
 			i++
 		}
 		sum := sumLogs(values)
 		if sum <= math.Inf(-1) {
 			p := math.Log2(1.0 / float64(len(dict)))
-			for k := range dict {
-				dict[k] = p
+			for _, pe := range dict {
+				pe.prob = p
 			}
 		} else {
-			for k := range dict {
-				dict[k] -= sum
+			for _, pe := range dict {
+				pe.prob -= sum
 			}
 		}
 	}
@@ -57,7 +57,7 @@ type encodedValue struct {
 
 type feature struct {
 	label    string
-	features map[string]string
+	features [17]string
 }
 
 type featureSet []feature
@@ -84,6 +84,7 @@ type binaryMaxentClassifier struct {
 	labels      []string
 	mapping     map[string]int
 	weights     []float64
+	buf         []byte
 }
 
 // newMaxentClassifier creates a new binaryMaxentClassifier from the provided
@@ -103,7 +104,8 @@ func newMaxentClassifier(
 		len(set) + 1,
 		labels,
 		mapping,
-		weights}
+		weights,
+		[]byte{}}
 }
 
 // marshal saves the model to disk.
@@ -188,11 +190,26 @@ func (e *entityExtracter) chunk(tokens []*Token) []Entity {
 	return entities
 }
 
-func (m *binaryMaxentClassifier) encode(features map[string]string, label string) []encodedValue {
-	encoding := []encodedValue{}
-	for _, key := range featureOrder {
-		val := features[key]
-		entry := strings.Join([]string{key, val, label}, "-")
+func (m *binaryMaxentClassifier) byteJoin(a, b, c string, rjc rune) string {
+	jc := byte(rjc)
+	n := len(a) + len(b) + len(c) + 2
+	if len(m.buf) < n {
+		m.buf = make([]byte, n)
+	}
+	copy(m.buf[0:], []byte(a))
+	m.buf[len(a)] = jc
+	copy(m.buf[len(a)+1:], []byte(b))
+	m.buf[len(a)+len(b)+1] = jc
+	copy(m.buf[len(a)+len(b)+2:], []byte(c))
+	res := string(m.buf[:n])
+	return res
+}
+
+func (m *binaryMaxentClassifier) encode(features [17]string, label string) []encodedValue {
+	encoding := make([]encodedValue, 0, 18)
+	for i, key := range featureOrder {
+		val := features[i]
+		entry := m.byteJoin(key, val, label, '-')
 		if ret, found := m.mapping[entry]; found {
 			encoding = append(encoding, encodedValue{
 				key:   ret,
@@ -202,7 +219,7 @@ func (m *binaryMaxentClassifier) encode(features map[string]string, label string
 	return encoding
 }
 
-func (m *binaryMaxentClassifier) encodeGIS(features map[string]string, label string) []encodedValue {
+func (m *binaryMaxentClassifier) encodeGIS(features [17]string, label string) []encodedValue {
 	encoding := m.encode(features, label)
 	length := len(m.mapping)
 
@@ -336,9 +353,9 @@ func estCount(
 	count := mat.NewVecDense(len(encoder.mapping)+1, nil)
 	for _, entry := range corpus {
 		pdist := classifier.probClassify(entry.features)
-		for label := range pdist.dict {
-			prob := pdist.prob(label)
-			for _, enc := range encoder.encodeGIS(entry.features, label) {
+		for _, pe := range pdist.dict {
+			prob := math.Pow(2, pe.prob)
+			for _, enc := range pe.vec {
 				out := count.AtVec(enc.key) + (prob * float64(enc.value))
 				count.SetVec(enc.key, out)
 			}
@@ -379,15 +396,20 @@ func maxMap(scores map[string]float64) string {
 	return class
 }
 
-func (e *entityExtracter) probClassify(features map[string]string) *mappedProbDist {
-	scores := make(map[string]float64)
+type probEnc struct {
+	prob float64
+	vec  []encodedValue
+}
+
+func (e *entityExtracter) probClassify(features [17]string) *mappedProbDist {
+	scores := make(map[string]*probEnc, len(e.model.labels))
 	for _, label := range e.model.labels {
 		vec := e.model.encodeGIS(features, label)
 		total := 0.0
 		for _, entry := range vec {
 			total += e.model.weights[entry.key] * float64(entry.value)
 		}
-		scores[label] = total
+		scores[label] = &probEnc{prob: total, vec: vec}
 	}
 
 	//&mappedProbDist{dict: scores, log: true}
@@ -416,49 +438,51 @@ func coalesce(parts []*Token) Entity {
 	}
 }
 
-func extract(i int, ctx []*Token, history []string) map[string]string {
-	feats := make(map[string]string)
+const NoneFeat = "None"
 
+func extract(i int, ctx []*Token, history []string) [17]string {
+	//feats := make(map[string]string)
+	feats := [17]string{}
 	word := ctx[i].Text
-	prevShape := "None"
+	prevShape := NoneFeat
 
-	feats["bias"] = "True"
-	feats["word"] = word
-	feats["pos"] = ctx[i].Tag
-	feats["en-wordlist"] = isBasic(word)
-	feats["word.lower"] = strings.ToLower(word)
-	feats["suffix3"] = nSuffix(word, 3)
-	feats["prefix3"] = nPrefix(word, 3)
-	feats["shape"] = shape(word)
-	feats["wordlen"] = strconv.Itoa(len(word))
+	feats[0] = "True"
+	feats[13] = word
+	feats[4] = ctx[i].Tag
+	feats[2] = isBasic(word)
+	feats[15] = strings.ToLower(word)
+	feats[12] = nSuffix(word, 3)
+	feats[6] = nPrefix(word, 3)
+	feats[10] = shape(word)
+	feats[16] = strconv.Itoa(len(word))
 
 	if i == 0 {
-		feats["prevtag"] = "None"
-		feats["prevword"], feats["prevpos"] = "None", "None"
+		feats[8] = NoneFeat
+		feats[9], feats[7] = NoneFeat, NoneFeat
 	} else if i == 1 {
-		feats["prevword"] = strings.ToLower(ctx[i-1].Text)
-		feats["prevpos"] = ctx[i-1].Tag
-		feats["prevtag"] = history[i-1]
+		feats[9] = strings.ToLower(ctx[i-1].Text)
+		feats[7] = ctx[i-1].Tag
+		feats[8] = history[i-1]
 	} else {
-		feats["prevword"] = strings.ToLower(ctx[i-1].Text)
-		feats["prevpos"] = ctx[i-1].Tag
-		feats["prevtag"] = history[i-1]
+		feats[9] = strings.ToLower(ctx[i-1].Text)
+		feats[7] = ctx[i-1].Tag
+		feats[8] = history[i-1]
 		prevShape = shape(ctx[i-1].Text)
 	}
 
 	if i == len(ctx)-1 {
-		feats["nextword"], feats["nextpos"] = "None", "None"
+		feats[3], feats[2] = NoneFeat, NoneFeat
 	} else {
-		feats["nextword"] = strings.ToLower(ctx[i+1].Text)
-		feats["nextpos"] = strings.ToLower(ctx[i+1].Tag)
+		feats[3] = strings.ToLower(ctx[i+1].Text)
+		feats[2] = strings.ToLower(ctx[i+1].Tag)
 	}
 
-	feats["word+nextpos"] = strings.Join(
-		[]string{feats["word.lower"], feats["nextpos"]}, "+")
-	feats["pos+prevtag"] = strings.Join(
-		[]string{feats["pos"], feats["prevtag"]}, "+")
-	feats["shape+prevtag"] = strings.Join(
-		[]string{prevShape, feats["prevtag"]}, "+")
+	feats[14] = strings.Join(
+		[]string{feats[15], feats[2]}, "+")
+	feats[5] = strings.Join(
+		[]string{feats[4], feats[8]}, "+")
+	feats[11] = strings.Join(
+		[]string{prevShape, feats[8]}, "+")
 
 	return feats
 }
@@ -499,8 +523,8 @@ func encode(corpus featureSet) *binaryMaxentClassifier {
 			labels = append(labels, label)
 		}
 
-		for _, fname := range featureOrder {
-			fval := entry.features[fname]
+		for i, fname := range featureOrder {
+			fval := entry.features[i]
 			key := strings.Join([]string{fname, fval}, "-")
 			count[key]++
 			entry := strings.Join([]string{fname, fval, label}, "-")
