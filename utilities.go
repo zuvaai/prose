@@ -3,18 +3,12 @@ package prose
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"io/fs"
 	"path"
 	"strconv"
 	"strings"
 )
-
-// checkError panics if `err` is not `nil`.
-func checkError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 // min returns the minimum of `a` and `b`.
 func min(a, b int) int {
@@ -40,10 +34,12 @@ func stringInSlice(a string, slice []string) bool {
 	return false
 }
 
-func getAsset(folder, name string) *gob.Decoder {
+func getAsset(folder, name string) (*gob.Decoder, error) {
 	b, err := ReadBytes(path.Join(folder, name))
-	checkError(err)
-	return gob.NewDecoder(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read stored gob: %w", err)
+	}
+	return gob.NewDecoder(bytes.NewReader(b)), nil
 }
 
 func getDiskAsset(file fs.File) *gob.Decoder {

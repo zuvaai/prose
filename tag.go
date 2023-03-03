@@ -21,12 +21,9 @@
 package prose
 
 import (
-	"encoding/gob"
 	"fmt"
 	"math"
-	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -66,13 +63,13 @@ var keep = regexp.MustCompile(`^\-[A-Z]{3}\-$`)
 
 // averagedPerceptron is a Averaged Perceptron classifier.
 type averagedPerceptron struct {
-	classes       []string
-	classMap      map[string]int
-	iClassMap     map[int]string
-	stamps        map[string]float64
-	totals        map[string]float64
-	tagMap        map[string]string
-	weights       map[string]map[string]float64
+	classes   []string
+	classMap  map[string]int
+	iClassMap map[int]string
+	stamps    map[string]float64
+	totals    map[string]float64
+	tagMap    map[string]string
+	//	weights       map[string]map[string]float64
 	linearWeights map[string][]float64
 
 	// TODO: Training
@@ -81,8 +78,7 @@ type averagedPerceptron struct {
 }
 
 // newAveragedPerceptron creates a new AveragedPerceptron model.
-func newAveragedPerceptron(weights map[string]map[string]float64,
-	tags map[string]string, classes []string, linearWeights map[string][]float64) *averagedPerceptron {
+func newAveragedPerceptron(tags map[string]string, classes []string, linearWeights map[string][]float64) *averagedPerceptron {
 	cm := make(map[string]int, len(classes))
 	icm := make(map[int]string, len(classes))
 	for i := range classes {
@@ -91,22 +87,8 @@ func newAveragedPerceptron(weights map[string]map[string]float64,
 	}
 	return &averagedPerceptron{
 		totals: make(map[string]float64), stamps: make(map[string]float64),
-		classes: classes, tagMap: tags, weights: weights, classMap: cm, linearWeights: linearWeights,
+		classes: classes, tagMap: tags, classMap: cm, linearWeights: linearWeights,
 		iClassMap: icm}
-}
-
-func (ap *averagedPerceptron) writeWeights() error {
-	folder := filepath.Join("model", "AveragedPerceptron")
-	err := os.Mkdir(folder, os.ModePerm)
-	for i, entry := range []string{"weights-linear"} {
-		component, _ := os.Create(filepath.Join(folder, entry+".gob"))
-		encoder := gob.NewEncoder(component)
-		if i == 0 {
-			checkError(encoder.Encode(ap.linearWeights))
-		}
-
-	}
-	return err
 }
 
 /* TODO: Training API
@@ -274,7 +256,6 @@ type PerceptronTagger struct {
 // newPerceptronTagger creates a new PerceptronTagger and loads the built-in
 // AveragedPerceptron model.
 func NewPerceptronTagger() (*PerceptronTagger, error) {
-	var wts map[string]map[string]float64
 	var tags map[string]string
 	var classes []string
 	var lwts map[string][]float64
@@ -297,15 +278,6 @@ func NewPerceptronTagger() (*PerceptronTagger, error) {
 		return nil, fmt.Errorf("unable to decode tags: %w", err)
 	}
 
-	dec, err = ReadAndDecodeBytes(path.Join("AveragedPerceptron", "weights.gob"))
-	if err != nil {
-		return nil, fmt.Errorf("unable to read weights: %w", err)
-	}
-	err = dec.Decode(&wts)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode weights: %w", err)
-	}
-
 	dec, err = ReadAndDecodeBytes(path.Join("AveragedPerceptron", "weights-linear.gob"))
 	if err != nil {
 		return nil, fmt.Errorf("unable to read linear weights: %w", err)
@@ -315,7 +287,7 @@ func NewPerceptronTagger() (*PerceptronTagger, error) {
 		return nil, fmt.Errorf("unable to decode lienar weights: %w", err)
 	}
 
-	return &PerceptronTagger{model: newAveragedPerceptron(wts, tags, classes, lwts)}, nil
+	return &PerceptronTagger{model: newAveragedPerceptron(tags, classes, lwts)}, nil
 }
 
 // Tag takes a slice of words and returns a slice of tagged tokens.

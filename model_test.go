@@ -2,11 +2,13 @@ package prose
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +23,8 @@ func TestModelFromDisk(t *testing.T) {
 
 	temp := filepath.Join(testdata, "temp")
 	_ = os.RemoveAll(temp)
-
+	fmt.Println(model.extracter.model.labels)
+	fmt.Println(model.extracter.model.weights)
 	err = model.Write(temp)
 	require.NoError(t, err)
 	model, err = ModelFromDisk(temp)
@@ -36,9 +39,9 @@ var embeddedModel embed.FS
 
 func TestModelFromFS(t *testing.T) {
 	err := fs.WalkDir(embeddedModel, ".", func(path string, d fs.DirEntry, err error) error {
-		//fmt.Printf("Walking dir %s, err %s\n", path, err)
 		return nil
 	})
+	assert.NoError(t, err)
 
 	// Load the embedded PRODUCT model
 	model, err := ModelFromFS("PRODUCT", embeddedModel)

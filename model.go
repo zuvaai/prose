@@ -71,10 +71,14 @@ func ModelFromDisk(path string) (*Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to load POS tager from disk: %w", err)
 	}
+	classifier, err := loadClassifier(filesys)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load classifier from disk: %w", err)
+	}
 	return &Model{
 		Name: filepath.Base(path),
 
-		extracter: loadClassifier(filesys),
+		extracter: classifier,
 		tagger:    tagger,
 	}, nil
 }
@@ -100,16 +104,20 @@ func ModelFromFS(name string, filesys fs.FS) (*Model, error) {
 		return nil
 	})
 	if err != io.EOF {
-		checkError(err)
+		return nil, fmt.Errorf("expected EOF but got: %w", err)
 	}
 	tagger, err := NewPerceptronTagger()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create POS tagger: %w", err)
+		return nil, fmt.Errorf("unable to create POS tagger FS: %w", err)
+	}
+	classifier, err := loadClassifier(modelFS)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load classifier from FS: %w", err)
 	}
 	return &Model{
 		Name: name,
 
-		extracter: loadClassifier(modelFS),
+		extracter: classifier,
 		tagger:    tagger,
 	}, nil
 }
@@ -117,9 +125,11 @@ func ModelFromFS(name string, filesys fs.FS) (*Model, error) {
 // Write saves a Model to the user-provided location.
 func (m *Model) Write(path string) error {
 	err := os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("unable to open directory: %w", err)
+	}
 	// m.Tagger.model.Marshal(path)
-	checkError(m.extracter.model.marshal(path))
-	return err
+	return m.extracter.model.marshal(path)
 }
 
 /* TODO: External taggers
@@ -142,28 +152,46 @@ func loadTagger(path string) *perceptronTagger {
 	return newTrainedPerceptronTagger(model)
 }*/
 
-func loadClassifier(filesys fs.FS) *entityExtracter {
+func loadClassifier(filesys fs.FS) (*entityExtracter, error) {
 	var mapping map[string]int
 	var weights []float64
 	var labels []string
 
 	maxent, err := fs.Sub(filesys, "Maxent")
-	checkError(err)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open subdirectory Maxent: %w", err)
+	}
 
 	file, err := maxent.Open("mapping.gob")
-	checkError(err)
-	checkError(getDiskAsset(file).Decode(&mapping))
+	if err != nil {
+		return nil, fmt.Errorf("unable to open mapping.gob: %w", err)
+	}
+
+	err = getDiskAsset(file).Decode(&mapping)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode mapping: %w", err)
+	}
 
 	file, err = maxent.Open("weights.gob")
-	checkError(err)
-	checkError(getDiskAsset(file).Decode(&weights))
+	if err != nil {
+		return nil, fmt.Errorf("unable to open weights.gob: %w", err)
+	}
+	err = getDiskAsset(file).Decode(&weights)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode weights: %w", err)
+	}
 
 	file, err = maxent.Open("labels.gob")
-	checkError(err)
-	checkError(getDiskAsset(file).Decode(&labels))
+	if err != nil {
+		return nil, fmt.Errorf("unable to open labels.gob: %w", err)
+	}
+	err = getDiskAsset(file).Decode(&labels)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode labels: %w", err)
+	}
 
 	model := newMaxentClassifier(weights, mapping, labels)
-	return newTrainedEntityExtracter(model)
+	return newTrainedEntityExtracter(model), nil
 }
 
 func defaultModel(tagging, classifying bool) (*Model, error) {
@@ -177,7 +205,10 @@ func defaultModel(tagging, classifying bool) (*Model, error) {
 		}
 	}
 	if classifying {
-		classifier = newEntityExtracter()
+		classifier, err = newEntityExtracter()
+		if err != nil {
+			return nil, fmt.Errorf("unable to load default NER: %w", err)
+		}
 	}
 
 	return &Model{

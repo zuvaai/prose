@@ -122,7 +122,10 @@ func NewDocument(text string, opts ...DocOpt) (*Document, error) {
 	}
 
 	if base.Segment {
-		segmenter := newPunktSentenceTokenizer()
+		segmenter, err := newPunktSentenceTokenizer()
+		if err != nil {
+			return nil, fmt.Errorf("unable to create punkt segmenter: %w", err)
+		}
 		doc.sentences = segmenter.segment(text)
 	}
 	if base.Tokenizer != nil {

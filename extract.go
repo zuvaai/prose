@@ -2,6 +2,7 @@ package prose
 
 import (
 	"encoding/gob"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -18,13 +19,6 @@ var maxLogDiff = math.Log2(1e-30)
 type mappedProbDist struct {
 	dict map[string]*probEnc
 	log  bool
-}
-
-func (m *mappedProbDist) prob(label string) float64 {
-	if p, found := m.dict[label]; found {
-		return math.Pow(2, p.prob)
-	}
-	return 0.0
 }
 
 func newMappedProbDist(dict map[string]*probEnc, normalize bool) *mappedProbDist {
@@ -112,18 +106,31 @@ func newMaxentClassifier(
 func (m *binaryMaxentClassifier) marshal(path string) error {
 	folder := filepath.Join(path, "Maxent")
 	err := os.Mkdir(folder, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("unable to create directory: %w", err)
+	}
 	for i, entry := range []string{"labels", "mapping", "weights"} {
 		component, _ := os.Create(filepath.Join(folder, entry+".gob"))
 		encoder := gob.NewEncoder(component)
 		if i == 0 {
-			checkError(encoder.Encode(m.labels))
+			err = encoder.Encode(m.labels)
+			if err != nil {
+				err = fmt.Errorf("unable to marshal labels: %w", err)
+			}
 		} else if i == 1 {
-			checkError(encoder.Encode(m.mapping))
+			err = encoder.Encode(m.mapping)
+			if err != nil {
+				err = fmt.Errorf("unable to marshal mapping: %w", err)
+			}
+
 		} else {
-			checkError(encoder.Encode(m.weights))
+			err = encoder.Encode(m.weights)
+			if err != nil {
+				return fmt.Errorf("unable to marshal weights: %w", err)
+			}
 		}
 	}
-	return err
+	return nil
 }
 
 // entityExtracter is a maximum entropy classifier.
@@ -135,21 +142,39 @@ type entityExtracter struct {
 }
 
 // newEntityExtracter creates a new entityExtracter using the default model.
-func newEntityExtracter() *entityExtracter {
+func newEntityExtracter() (*entityExtracter, error) {
 	var mapping map[string]int
 	var weights []float64
 	var labels []string
 
-	dec := getAsset("Maxent", "mapping.gob")
-	checkError(dec.Decode(&mapping))
+	dec, err := getAsset("Maxent", "mapping.gob")
+	if err != nil {
+		return nil, fmt.Errorf("unable to load mapping.gob: %w", err)
+	}
+	err = dec.Decode(&mapping)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode mapping.gob: %w", err)
+	}
 
-	dec = getAsset("Maxent", "weights.gob")
-	checkError(dec.Decode(&weights))
+	dec, err = getAsset("Maxent", "weights.gob")
+	if err != nil {
+		return nil, fmt.Errorf("unable to load weights.gob: %w", err)
+	}
+	err = dec.Decode(&weights)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode weights.gob: %w", err)
+	}
 
-	dec = getAsset("Maxent", "labels.gob")
-	checkError(dec.Decode(&labels))
+	dec, err = getAsset("Maxent", "labels.gob")
+	if err != nil {
+		return nil, fmt.Errorf("unable to load labels.gob: %w", err)
+	}
+	err = dec.Decode(&labels)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode labels.gob: %w", err)
+	}
 
-	return &entityExtracter{model: newMaxentClassifier(weights, mapping, labels)}
+	return &entityExtracter{model: newMaxentClassifier(weights, mapping, labels)}, nil
 }
 
 // newTrainedEntityExtracter creates a new EntityExtracter using the given

@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type goldenRule struct {
@@ -13,12 +15,12 @@ type goldenRule struct {
 	Output []string
 }
 
-func readDataFile(path string) []byte {
+func readDataFile(path string, t testing.TB) []byte {
 	p, err := filepath.Abs(path)
-	checkError(err)
+	require.NoError(t, err)
 
-	data, ferr := ioutil.ReadFile(p)
-	checkError(ferr)
+	data, err := ioutil.ReadFile(p)
+	require.NoError(t, err)
 
 	return data
 }
@@ -33,15 +35,14 @@ func makeSegmenter(text string) (*Document, error) {
 
 func BenchmarkPunkt(b *testing.B) {
 	tests := make([]goldenRule, 0)
-	cases := readDataFile(filepath.Join(testdata, "golden_rules_en.json"))
+	cases := readDataFile(filepath.Join(testdata, "golden_rules_en.json"), b)
 
-	checkError(json.Unmarshal(cases, &tests))
+	err := json.Unmarshal(cases, &tests)
+	require.NoError(b, err)
 	for n := 0; n < b.N; n++ {
 		for i := range tests {
 			_, err := makeSegmenter(tests[i].Input)
-			if err != nil {
-				panic(err)
-			}
+			require.NoError(b, err)
 		}
 	}
 }
