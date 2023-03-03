@@ -6,12 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestModelFromDisk(t *testing.T) {
 	data := filepath.Join(testdata, "PRODUCT")
 
-	model := ModelFromDisk(data)
+	model, err := ModelFromDisk(data)
+	require.NoError(t, err)
 	if model.Name != "PRODUCT" {
 		t.Errorf("ModelFromDisk() expected = PRODUCT, got = %v", model.Name)
 	}
@@ -19,11 +22,10 @@ func TestModelFromDisk(t *testing.T) {
 	temp := filepath.Join(testdata, "temp")
 	_ = os.RemoveAll(temp)
 
-	err := model.Write(temp)
-	if err != nil {
-		panic(err)
-	}
-	model = ModelFromDisk(temp)
+	err = model.Write(temp)
+	require.NoError(t, err)
+	model, err = ModelFromDisk(temp)
+	require.NoError(t, err)
 	if model.Name != "temp" {
 		t.Errorf("ModelFromDisk() expected = temp, got = %v", model.Name)
 	}
@@ -39,7 +41,8 @@ func TestModelFromFS(t *testing.T) {
 	})
 
 	// Load the embedded PRODUCT model
-	model := ModelFromFS("PRODUCT", embeddedModel)
+	model, err := ModelFromFS("PRODUCT", embeddedModel)
+	require.NoError(t, err)
 	if model.Name != "PRODUCT" {
 		t.Errorf("ModelFromFS() expected = PRODUCT, got = %v", model.Name)
 	}

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func makeTagger(text string) (*Document, error) {
@@ -38,7 +40,8 @@ func TestTagSimple(t *testing.T) {
 }
 
 func TestTagTreebank(t *testing.T) {
-	tagger := newPerceptronTagger()
+	tagger, err := NewPerceptronTagger()
+	assert.NoError(t, err)
 	tokens, expected := []*Token{}, []string{}
 
 	tags := readDataFile(filepath.Join(testdata, "treebank_tags.json"))
@@ -48,7 +51,7 @@ func TestTagTreebank(t *testing.T) {
 	checkError(json.Unmarshal(treebank, &tokens))
 
 	correct := 0.0
-	for i, tok := range tagger.tag(tokens) {
+	for i, tok := range tagger.Tag(tokens) {
 		if expected[i] == tok.Tag {
 			correct++
 		}
@@ -61,13 +64,14 @@ func TestTagTreebank(t *testing.T) {
 }
 
 func BenchmarkTag(b *testing.B) {
-	tagger := newPerceptronTagger()
+	tagger, err := NewPerceptronTagger()
+	assert.NoError(b, err)
 	tokens := []*Token{}
 
 	treebank := readDataFile(filepath.Join(testdata, "treebank_tokens.json"))
 	checkError(json.Unmarshal(treebank, &tokens))
 	for n := 0; n < b.N; n++ {
-		_ = tagger.tag(tokens)
+		_ = tagger.Tag(tokens)
 	}
 }
 

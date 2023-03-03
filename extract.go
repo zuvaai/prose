@@ -70,9 +70,9 @@ var featureOrder = []string{
 // binaryMaxentClassifier is a feature encoding that generates vectors
 // containing binary joint-features of the form:
 //
-//    |  joint_feat(fs, l) = { 1 if (fs[fname] == fval) and (l == label)
-//    |                      {
-//    |                      { 0 otherwise
+//	|  joint_feat(fs, l) = { 1 if (fs[fname] == fval) and (l == label)
+//	|                      {
+//	|                      { 0 otherwise
 //
 // where `fname` is the name of an input-feature, `fval` is a value for that
 // input-feature, and `label` is a label.
@@ -269,11 +269,11 @@ func assignLabels(tokens []*Token, entity *EntityContext) []string {
 	return history
 }
 
-func makeCorpus(data []EntityContext, tagger *perceptronTagger, tokenizer Tokenizer) featureSet {
+func makeCorpus(data []EntityContext, tagger *PerceptronTagger, tokenizer Tokenizer) featureSet {
 	corpus := featureSet{}
 	for i := range data {
 		entry := &data[i]
-		tokens := tagger.tag(tokenizer.Tokenize(entry.Text))
+		tokens := tagger.Tag(tokenizer.Tokenize(entry.Text))
 		history := assignLabels(tokens, entry)
 		for _, element := range extractFeatures(tokens, history) {
 			corpus = append(corpus, element)
@@ -360,11 +360,23 @@ func (e *entityExtracter) classify(tokens []*Token) []*Token {
 			}
 			scores[label] = total
 		}
-		label := max(scores)
+		label := maxMap(scores)
 		tokens[i].Label = label
 		history = append(history, simplePOS(label))
 	}
 	return tokens
+}
+
+func maxMap(scores map[string]float64) string {
+	var class string
+	max := math.Inf(-1)
+	for label, value := range scores {
+		if value > max {
+			max = value
+			class = label
+		}
+	}
+	return class
 }
 
 func (e *entityExtracter) probClassify(features map[string]string) *mappedProbDist {

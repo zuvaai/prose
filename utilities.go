@@ -41,7 +41,7 @@ func stringInSlice(a string, slice []string) bool {
 }
 
 func getAsset(folder, name string) *gob.Decoder {
-	b, err := Asset(path.Join("model", folder, name))
+	b, err := ReadBytes(path.Join(folder, name))
 	checkError(err)
 	return gob.NewDecoder(bytes.NewReader(b))
 }
