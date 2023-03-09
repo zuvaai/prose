@@ -63,12 +63,11 @@ var keep = regexp.MustCompile(`^\-[A-Z]{3}\-$`)
 
 // averagedPerceptron is a Averaged Perceptron classifier.
 type averagedPerceptron struct {
-	classes   []string
-	classMap  map[string]int
-	iClassMap map[int]string
-	stamps    map[string]float64
-	totals    map[string]float64
-	tagMap    map[string]string
+	classes  []string
+	classMap map[string]int
+	stamps   map[string]float64
+	totals   map[string]float64
+	tagMap   map[string]string
 	//	weights       map[string]map[string]float64
 	linearWeights map[string][]float64
 
@@ -80,15 +79,12 @@ type averagedPerceptron struct {
 // newAveragedPerceptron creates a new AveragedPerceptron model.
 func newAveragedPerceptron(tags map[string]string, classes []string, linearWeights map[string][]float64) *averagedPerceptron {
 	cm := make(map[string]int, len(classes))
-	icm := make(map[int]string, len(classes))
 	for i := range classes {
 		cm[classes[i]] = i
-		icm[i] = classes[i]
 	}
 	return &averagedPerceptron{
 		totals: make(map[string]float64), stamps: make(map[string]float64),
-		classes: classes, tagMap: tags, classMap: cm, linearWeights: linearWeights,
-		iClassMap: icm}
+		classes: classes, tagMap: tags, classMap: cm, linearWeights: linearWeights}
 }
 
 /* TODO: Training API
@@ -342,7 +338,7 @@ func (m *averagedPerceptron) predict(features [14]freq) string {
 			scores[label] += feat.cnt * weight
 		}
 	}
-	return m.iClassMap[max(scores)]
+	return m.classes[max(scores)]
 }
 
 func max(scores []float64) int {
@@ -363,39 +359,24 @@ type freq struct {
 }
 
 func featurize(i int, ctx []string, w, p1, p2 string) [14]freq {
-	//feats := make(map[string]float64)
 	freqInfo := [14]freq{}
 	suf := min(len(w), 3)
 	i = min(len(ctx)-2, i+2)
 	iminus := min(len(ctx[i-1]), 3)
 	iplus := min(len(ctx[i+1]), 3)
-	//feats = add([]string{"bias"}, feats)
 	freqInfo[0] = freq{"bias", 1}
-	//feats = add([]string{"i suffix", w[len(w)-suf:]}, feats)
 	freqInfo[1] = freq{strings.Join([]string{"i suffix", w[len(w)-suf:]}, " "), 1}
-	//feats = add([]string{"i pref1", string(w[0])}, feats)
 	freqInfo[2] = freq{strings.Join([]string{"i pref1", string(w[0])}, " "), 1}
-	//feats = add([]string{"i-1 tag", p1}, feats)
 	freqInfo[3] = freq{strings.Join([]string{"i-1 tag", p1}, " "), 1}
-	//feats = add([]string{"i-2 tag", p2}, feats)
 	freqInfo[4] = freq{strings.Join([]string{"i-2 tag", p2}, " "), 1}
-	//feats = add([]string{"i tag+i-2 tag", p1, p2}, feats)
 	freqInfo[5] = freq{strings.Join([]string{"i tag+i-2 tag", p1, p2}, " "), 1}
-	//feats = add([]string{"i word", ctx[i]}, feats)
 	freqInfo[6] = freq{strings.Join([]string{"i word", ctx[i]}, " "), 1}
-	//feats = add([]string{"i-1 tag+i word", p1, ctx[i]}, feats)
 	freqInfo[7] = freq{strings.Join([]string{"i-1 tag+i word", p1, ctx[i]}, " "), 1}
-	//feats = add([]string{"i-1 word", ctx[i-1]}, feats)
 	freqInfo[8] = freq{strings.Join([]string{"i-1 word", ctx[i-1]}, " "), 1}
-	//feats = add([]string{"i-1 suffix", ctx[i-1][len(ctx[i-1])-iminus:]}, feats)
 	freqInfo[9] = freq{strings.Join([]string{"i-1 suffix", ctx[i-1][len(ctx[i-1])-iminus:]}, " "), 1}
-	//feats = add([]string{"i-2 word", ctx[i-2]}, feats)
 	freqInfo[10] = freq{strings.Join([]string{"i-2 word", ctx[i-2]}, " "), 1}
-	//feats = add([]string{"i+1 word", ctx[i+1]}, feats)
 	freqInfo[11] = freq{strings.Join([]string{"i+1 word", ctx[i+1]}, " "), 1}
-	//feats = add([]string{"i+1 suffix", ctx[i+1][len(ctx[i+1])-iplus:]}, feats)
 	freqInfo[12] = freq{strings.Join([]string{"i+1 suffix", ctx[i+1][len(ctx[i+1])-iplus:]}, " "), 1}
-	//feats = add([]string{"i+2 word", ctx[i+2]}, feats)
 	freqInfo[13] = freq{strings.Join([]string{"i+2 word", ctx[i+2]}, " "), 1}
 	return freqInfo
 }
