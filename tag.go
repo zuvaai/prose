@@ -325,17 +325,19 @@ func (pt *PerceptronTagger) Tag(tokens []*Token) []*Token {
 	return tokens
 }
 
-func (m *averagedPerceptron) predict(features [14]freq) string {
+func (m *averagedPerceptron) predict(features [14]string) string {
 	var weights []float64
 	var found bool
 
 	scores := make([]float64, len(m.classes))
 	for _, feat := range features {
-		if weights, found = m.linearWeights[feat.feat]; !found || feat.cnt == 0 {
+		// if we re-add training then also check feat.cnt == 0 {
+		if weights, found = m.linearWeights[feat]; !found {
 			continue
 		}
 		for label, weight := range weights {
-			scores[label] += feat.cnt * weight
+			// If we add training then scores[label] += feat.cnt * weight
+			scores[label] += weight
 		}
 	}
 	return m.classes[max(scores)]
@@ -353,32 +355,33 @@ func max(scores []float64) int {
 	return class
 }
 
-type freq struct {
-	feat string
-	cnt  float64
-}
+// We may need this struct if we want to add back training code
+// type freq struct {
+// 	feat string
+// 	cnt  float64
+// }
 
-func featurize(i int, ctx []string, w, p1, p2 string) [14]freq {
-	freqInfo := [14]freq{}
+func featurize(i int, ctx []string, w, p1, p2 string) [14]string {
+	feats := [14]string{}
 	suf := min(len(w), 3)
 	i = min(len(ctx)-2, i+2)
 	iminus := min(len(ctx[i-1]), 3)
 	iplus := min(len(ctx[i+1]), 3)
-	freqInfo[0] = freq{"bias", 1}
-	freqInfo[1] = freq{strings.Join([]string{"i suffix", w[len(w)-suf:]}, " "), 1}
-	freqInfo[2] = freq{strings.Join([]string{"i pref1", string(w[0])}, " "), 1}
-	freqInfo[3] = freq{strings.Join([]string{"i-1 tag", p1}, " "), 1}
-	freqInfo[4] = freq{strings.Join([]string{"i-2 tag", p2}, " "), 1}
-	freqInfo[5] = freq{strings.Join([]string{"i tag+i-2 tag", p1, p2}, " "), 1}
-	freqInfo[6] = freq{strings.Join([]string{"i word", ctx[i]}, " "), 1}
-	freqInfo[7] = freq{strings.Join([]string{"i-1 tag+i word", p1, ctx[i]}, " "), 1}
-	freqInfo[8] = freq{strings.Join([]string{"i-1 word", ctx[i-1]}, " "), 1}
-	freqInfo[9] = freq{strings.Join([]string{"i-1 suffix", ctx[i-1][len(ctx[i-1])-iminus:]}, " "), 1}
-	freqInfo[10] = freq{strings.Join([]string{"i-2 word", ctx[i-2]}, " "), 1}
-	freqInfo[11] = freq{strings.Join([]string{"i+1 word", ctx[i+1]}, " "), 1}
-	freqInfo[12] = freq{strings.Join([]string{"i+1 suffix", ctx[i+1][len(ctx[i+1])-iplus:]}, " "), 1}
-	freqInfo[13] = freq{strings.Join([]string{"i+2 word", ctx[i+2]}, " "), 1}
-	return freqInfo
+	feats[0] = "bias"
+	feats[1] = strings.Join([]string{"i suffix", w[len(w)-suf:]}, " ")
+	feats[2] = strings.Join([]string{"i pref1", string(w[0])}, " ")
+	feats[3] = strings.Join([]string{"i-1 tag", p1}, " ")
+	feats[4] = strings.Join([]string{"i-2 tag", p2}, " ")
+	feats[5] = strings.Join([]string{"i tag+i-2 tag", p1, p2}, " ")
+	feats[6] = strings.Join([]string{"i word", ctx[i]}, " ")
+	feats[7] = strings.Join([]string{"i-1 tag+i word", p1, ctx[i]}, " ")
+	feats[8] = strings.Join([]string{"i-1 word", ctx[i-1]}, " ")
+	feats[9] = strings.Join([]string{"i-1 suffix", ctx[i-1][len(ctx[i-1])-iminus:]}, " ")
+	feats[10] = strings.Join([]string{"i-2 word", ctx[i-2]}, " ")
+	feats[11] = strings.Join([]string{"i+1 word", ctx[i+1]}, " ")
+	feats[12] = strings.Join([]string{"i+1 suffix", ctx[i+1][len(ctx[i+1])-iplus:]}, " ")
+	feats[13] = strings.Join([]string{"i+2 word", ctx[i+2]}, " ")
+	return feats
 }
 
 func normalize(word string) string {

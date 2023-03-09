@@ -215,8 +215,8 @@ func (e *entityExtracter) chunk(tokens []*Token) []Entity {
 	return entities
 }
 
-func (m *binaryMaxentClassifier) byteJoin(a, b, c string, rjc rune) string {
-	jc := byte(rjc)
+func (m *binaryMaxentClassifier) byteJoin(a, b, c string) string {
+	jc := byte('-')
 	n := len(a) + len(b) + len(c) + 2
 	if len(m.buf) < n {
 		m.buf = make([]byte, n)
@@ -234,7 +234,7 @@ func (m *binaryMaxentClassifier) encode(features [17]string, label string) []enc
 	encoding := make([]encodedValue, 0, 18)
 	for i, key := range featureOrder {
 		val := features[i]
-		entry := m.byteJoin(key, val, label, '-')
+		entry := m.byteJoin(key, val, label)
 		if ret, found := m.mapping[entry]; found {
 			encoding = append(encoding, encodedValue{
 				key:   ret,
