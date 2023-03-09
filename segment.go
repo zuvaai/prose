@@ -37,14 +37,12 @@ type punktSentenceTokenizer struct {
 
 // newPunktSentenceTokenizer creates a new PunktSentenceTokenizer and loads
 // its English model.
-func newPunktSentenceTokenizer() *punktSentenceTokenizer {
+func newPunktSentenceTokenizer() (*punktSentenceTokenizer, error) {
 	var pt punktSentenceTokenizer
 	var err error
-
 	pt.tokenizer, err = newSentenceTokenizer(nil)
-	checkError(err)
 
-	return &pt
+	return &pt, err
 }
 
 // segment splits text into sentences.

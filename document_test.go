@@ -7,7 +7,7 @@ import (
 )
 
 func BenchmarkDoc(b *testing.B) {
-	content := readDataFile(filepath.Join(testdata, "sherlock.txt"))
+	content := readDataFile(filepath.Join(testdata, "sherlock.txt"), b)
 	text := string(content)
 	for n := 0; n < b.N; n++ {
 		_, err := NewDocument(text)
@@ -18,7 +18,7 @@ func BenchmarkDoc(b *testing.B) {
 }
 
 func BenchmarkCustomTokenizer(b *testing.B) {
-	content := readDataFile(filepath.Join(testdata, "sherlock.txt"))
+	content := readDataFile(filepath.Join(testdata, "sherlock.txt"), b)
 	tok := NewIterTokenizer(
 		UsingSanitizer(strings.NewReplacer()), // Disable sanitizer
 		UsingPrefixes([]string{"(", `"`, "[", "'"}),

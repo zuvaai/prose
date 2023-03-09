@@ -21,7 +21,9 @@
 package prose
 
 import (
+	"fmt"
 	"math"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -61,11 +63,13 @@ var keep = regexp.MustCompile(`^\-[A-Z]{3}\-$`)
 
 // averagedPerceptron is a Averaged Perceptron classifier.
 type averagedPerceptron struct {
-	classes []string
-	stamps  map[string]float64
-	totals  map[string]float64
-	tagMap  map[string]string
-	weights map[string]map[string]float64
+	classes  []string
+	classMap map[string]int
+	stamps   map[string]float64
+	totals   map[string]float64
+	tagMap   map[string]string
+	//	weights       map[string]map[string]float64
+	linearWeights map[string][]float64
 
 	// TODO: Training
 	//
@@ -73,11 +77,14 @@ type averagedPerceptron struct {
 }
 
 // newAveragedPerceptron creates a new AveragedPerceptron model.
-func newAveragedPerceptron(weights map[string]map[string]float64,
-	tags map[string]string, classes []string) *averagedPerceptron {
+func newAveragedPerceptron(tags map[string]string, classes []string, linearWeights map[string][]float64) *averagedPerceptron {
+	cm := make(map[string]int, len(classes))
+	for i := range classes {
+		cm[classes[i]] = i
+	}
 	return &averagedPerceptron{
 		totals: make(map[string]float64), stamps: make(map[string]float64),
-		classes: classes, tagMap: tags, weights: weights}
+		classes: classes, tagMap: tags, classMap: cm, linearWeights: linearWeights}
 }
 
 /* TODO: Training API
@@ -238,31 +245,49 @@ func (m *averagedPerceptron) addClass(class string) {
 
 // perceptronTagger is a port of Textblob's "fast and accurate" POS tagger.
 // See https://github.com/sloria/textblob-aptagger for details.
-type perceptronTagger struct {
+type PerceptronTagger struct {
 	model *averagedPerceptron
 }
 
 // newPerceptronTagger creates a new PerceptronTagger and loads the built-in
 // AveragedPerceptron model.
-func newPerceptronTagger() *perceptronTagger {
-	var wts map[string]map[string]float64
+func NewPerceptronTagger() (*PerceptronTagger, error) {
 	var tags map[string]string
 	var classes []string
+	var lwts map[string][]float64
 
-	dec := getAsset("AveragedPerceptron", "classes.gob")
-	checkError(dec.Decode(&classes))
+	dec, err := ReadAndDecodeBytes(path.Join("AveragedPerceptron", "classes.gob"))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read classes: %w", err)
+	}
+	err = dec.Decode(&classes)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode classes: %w", err)
+	}
 
-	dec = getAsset("AveragedPerceptron", "tags.gob")
-	checkError(dec.Decode(&tags))
+	dec, err = ReadAndDecodeBytes(path.Join("AveragedPerceptron", "tags.gob"))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read tags: %w", err)
+	}
+	err = dec.Decode(&tags)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode tags: %w", err)
+	}
 
-	dec = getAsset("AveragedPerceptron", "weights.gob")
-	checkError(dec.Decode(&wts))
+	dec, err = ReadAndDecodeBytes(path.Join("AveragedPerceptron", "weights-linear.gob"))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read linear weights: %w", err)
+	}
+	err = dec.Decode(&lwts)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode lienar weights: %w", err)
+	}
 
-	return &perceptronTagger{model: newAveragedPerceptron(wts, tags, classes)}
+	return &PerceptronTagger{model: newAveragedPerceptron(tags, classes, lwts)}, nil
 }
 
-// tag takes a slice of words and returns a slice of tagged tokens.
-func (pt *perceptronTagger) tag(tokens []*Token) []*Token {
+// Tag takes a slice of words and returns a slice of tagged tokens.
+func (pt *PerceptronTagger) Tag(tokens []*Token) []*Token {
 	var tag string
 	var found bool
 
@@ -300,24 +325,26 @@ func (pt *perceptronTagger) tag(tokens []*Token) []*Token {
 	return tokens
 }
 
-func (m *averagedPerceptron) predict(features map[string]float64) string {
-	var weights map[string]float64
+func (m *averagedPerceptron) predict(features [14]string) string {
+	var weights []float64
 	var found bool
 
-	scores := make(map[string]float64)
-	for feat, value := range features {
-		if weights, found = m.weights[feat]; !found || value == 0 {
+	scores := make([]float64, len(m.classes))
+	for _, feat := range features {
+		// if we re-add training then also check feat.cnt == 0 {
+		if weights, found = m.linearWeights[feat]; !found {
 			continue
 		}
 		for label, weight := range weights {
-			scores[label] += value * weight
+			// If we add training then scores[label] += feat.cnt * weight
+			scores[label] += weight
 		}
 	}
-	return max(scores)
+	return m.classes[max(scores)]
 }
 
-func max(scores map[string]float64) string {
-	var class string
+func max(scores []float64) int {
+	var class int
 	max := math.Inf(-1)
 	for label, value := range scores {
 		if value > max {
@@ -328,33 +355,33 @@ func max(scores map[string]float64) string {
 	return class
 }
 
-func featurize(i int, ctx []string, w, p1, p2 string) map[string]float64 {
-	feats := make(map[string]float64)
+// We may need this struct if we want to add back training code
+// type freq struct {
+// 	feat string
+// 	cnt  float64
+// }
+
+func featurize(i int, ctx []string, w, p1, p2 string) [14]string {
+	feats := [14]string{}
 	suf := min(len(w), 3)
 	i = min(len(ctx)-2, i+2)
 	iminus := min(len(ctx[i-1]), 3)
 	iplus := min(len(ctx[i+1]), 3)
-	feats = add([]string{"bias"}, feats)
-	feats = add([]string{"i suffix", w[len(w)-suf:]}, feats)
-	feats = add([]string{"i pref1", string(w[0])}, feats)
-	feats = add([]string{"i-1 tag", p1}, feats)
-	feats = add([]string{"i-2 tag", p2}, feats)
-	feats = add([]string{"i tag+i-2 tag", p1, p2}, feats)
-	feats = add([]string{"i word", ctx[i]}, feats)
-	feats = add([]string{"i-1 tag+i word", p1, ctx[i]}, feats)
-	feats = add([]string{"i-1 word", ctx[i-1]}, feats)
-	feats = add([]string{"i-1 suffix", ctx[i-1][len(ctx[i-1])-iminus:]}, feats)
-	feats = add([]string{"i-2 word", ctx[i-2]}, feats)
-	feats = add([]string{"i+1 word", ctx[i+1]}, feats)
-	feats = add([]string{"i+1 suffix", ctx[i+1][len(ctx[i+1])-iplus:]}, feats)
-	feats = add([]string{"i+2 word", ctx[i+2]}, feats)
+	feats[0] = "bias"
+	feats[1] = strings.Join([]string{"i suffix", w[len(w)-suf:]}, " ")
+	feats[2] = strings.Join([]string{"i pref1", string(w[0])}, " ")
+	feats[3] = strings.Join([]string{"i-1 tag", p1}, " ")
+	feats[4] = strings.Join([]string{"i-2 tag", p2}, " ")
+	feats[5] = strings.Join([]string{"i tag+i-2 tag", p1, p2}, " ")
+	feats[6] = strings.Join([]string{"i word", ctx[i]}, " ")
+	feats[7] = strings.Join([]string{"i-1 tag+i word", p1, ctx[i]}, " ")
+	feats[8] = strings.Join([]string{"i-1 word", ctx[i-1]}, " ")
+	feats[9] = strings.Join([]string{"i-1 suffix", ctx[i-1][len(ctx[i-1])-iminus:]}, " ")
+	feats[10] = strings.Join([]string{"i-2 word", ctx[i-2]}, " ")
+	feats[11] = strings.Join([]string{"i+1 word", ctx[i+1]}, " ")
+	feats[12] = strings.Join([]string{"i+1 suffix", ctx[i+1][len(ctx[i+1])-iplus:]}, " ")
+	feats[13] = strings.Join([]string{"i+2 word", ctx[i+2]}, " ")
 	return feats
-}
-
-func add(args []string, features map[string]float64) map[string]float64 {
-	key := strings.Join(args, " ")
-	features[key]++
-	return features
 }
 
 func normalize(word string) string {

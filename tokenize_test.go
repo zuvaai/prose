@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var testdata = "testdata"
@@ -43,23 +45,25 @@ func getTokenText(doc *Document) []string {
 	return observed
 }
 
-func getWordData(file string) ([]string, [][]string) {
-	in := readDataFile(filepath.Join(testdata, "treebank_sents.json"))
-	out := readDataFile(filepath.Join(testdata, file))
+func getWordData(file string, t *testing.T) ([]string, [][]string) {
+	in := readDataFile(filepath.Join(testdata, "treebank_sents.json"), t)
+	out := readDataFile(filepath.Join(testdata, file), t)
 
 	input := []string{}
 	output := [][]string{}
 
-	checkError(json.Unmarshal(in, &input))
-	checkError(json.Unmarshal(out, &output))
+	err := json.Unmarshal(in, &input)
+	require.NoError(t, err)
+	err = json.Unmarshal(out, &output)
+	require.NoError(t, err)
 
 	return input, output
 }
 
-func getWordBenchData() []string {
-	in := readDataFile(filepath.Join(testdata, "treebank_sents.json"))
+func getWordBenchData(b *testing.B) []string {
+	in := readDataFile(filepath.Join(testdata, "treebank_sents.json"), b)
 	input := []string{}
-	checkError(json.Unmarshal(in, &input))
+	require.NoError(b, json.Unmarshal(in, &input))
 	return input
 }
 
@@ -86,7 +90,7 @@ func TestTokenizationSimple(t *testing.T) {
 }
 
 func TestTokenizationTreebank(t *testing.T) {
-	input, output := getWordData("treebank_words.json")
+	input, output := getWordData("treebank_words.json", t)
 	for i, s := range input {
 		doc, _ := makeDoc(s)
 		tokens := getTokenText(doc)
@@ -209,7 +213,7 @@ func TestTokenizationContractions(t *testing.T) {
 }
 
 func BenchmarkTokenization(b *testing.B) {
-	in := readDataFile(filepath.Join(testdata, "sherlock.txt"))
+	in := readDataFile(filepath.Join(testdata, "sherlock.txt"), b)
 	text := string(in)
 	for n := 0; n < b.N; n++ {
 		_, err := makeDoc(text)
@@ -221,7 +225,7 @@ func BenchmarkTokenization(b *testing.B) {
 
 func BenchmarkTokenizationSimple(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		for _, s := range getWordBenchData() {
+		for _, s := range getWordBenchData(b) {
 			_, err := makeDoc(s)
 			if err != nil {
 				panic(err)

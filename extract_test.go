@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func makeNER(text string, model *Model) (*Document, error) {
@@ -76,7 +78,8 @@ func TestNERProdigy(t *testing.T) {
 	train, test := split(readProdigy(file))
 	correct := 0.0
 
-	model := ModelFromData("PRODUCT", UsingEntities(train))
+	model, err := ModelFromData("PRODUCT", UsingEntities(train))
+	require.NoError(t, err)
 	for _, entry := range test {
 		doc, _ := makeNER(entry.Text, model)
 		ents := doc.Entities()
