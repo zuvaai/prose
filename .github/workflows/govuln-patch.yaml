@@ -1,0 +1,47 @@
+name: Vulnerability patch
+
+on:
+  schedule:
+    - cron: "0 22 * * 0"
+  workflow_dispatch:
+    inputs:
+      modules:
+        description: >
+          Limit the run to specific modules, e.g. "services/a" or
+          "libs,services/*". Empty means the full repo.
+        type: string
+        default: ""
+      dry-run:
+        description: Report the plan without opening a PR
+        type: boolean
+        default: false
+      force:
+        description: Repush even if an identical PR is already open
+        type: boolean
+        default: false
+      max-bump:
+        description: Largest upgrade to apply automatically
+        type: choice
+        options: [patch, minor, major]
+        default: minor
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  patch:
+    uses: zuvaai/github-actions/.github/workflows/govuln-patch.yaml@main
+    with:
+      align-versions: true
+      scan-concurrency: "2"
+      timeout-minutes: 20
+      max-bump: ${{ inputs.max-bump || 'minor' }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}
+      force: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+      labels: dependencies,security
+      cooldown-days: 7
+    secrets:
+      GH_TOKEN: ${{ secrets.GITOPS_ZUVA_PAT }}
+      GITOPS_PGP_PRIVATE_KEY: ${{ secrets.GITOPS_PGP_PRIVATE_KEY }}
+      SSH_KEY: ${{ secrets.GITOPS_SSH_KEY }}
